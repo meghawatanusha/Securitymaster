@@ -5,6 +5,7 @@ import sys
 import requests, zipfile, io
 import datetime
 
+
 now = datetime.datetime.now()
 
 def downloadCSV(year="2013",mon="NOV",dd="06"):
