@@ -30,7 +30,7 @@ def main(args):
     start_date = datetime.datetime(int(args[0]), int(args[1]), int(args[2]))
     now = datetime.datetime.now()
     x = 0
-    y=0
+    y = 0
 	
     t = time()
 
