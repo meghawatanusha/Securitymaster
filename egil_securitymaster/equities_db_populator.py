@@ -103,8 +103,8 @@ def populate_last_egid (value_of_last_generated_egid,db_session,name_of_class):
 def main(args):
     
     start_date = datetime.datetime(int(args[0]), int(args[1]), int(args[2]))
-    #now = datetime.datetime.now()
-    now = start_date + datetime.timedelta(days=5)
+    now = datetime.datetime.now()
+    #now = start_date + datetime.timedelta(days=5)
 	
     t = time()
     
