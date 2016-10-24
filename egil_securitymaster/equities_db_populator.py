@@ -5,6 +5,7 @@ import sqlalchemy
 from sqlalchemy import *
 import numpy
 from numpy import genfromtxt
+import numpy as np
 from time import time
 import datetime
 from sqlalchemy import Column, Integer, Float, Date, String, BIGINT
@@ -19,14 +20,22 @@ from sqlalchemy.ext.automap import automap_base
 def Load_Data(year="2013",mon="NOV",dd="06"):
    #SYMBOL,SERIES,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,TOTTRDQTY,TOTTRDVAL,TIMESTAMP,TOTALTRADES,ISIN,
     file_name="cm%s%s%sbhav.csv" % (dd,mon,year)
-    if(os.path.isfile(file_name)): 
+    if(os.path.isfile(file_name)):
+      csvfile = open(file_name, 'r')
+      reader = csv.reader(csvfile, delimiter = ',')
+      num_cols = len(next(reader))
+      
+      if num_cols < 13 :
+        data = genfromtxt(file_name, delimiter=',', skip_header=1, converters={0: lambda y: str(y),1: lambda z: str(z),10: lambda x: str(x)})
+        return data.tolist()
+      else:
         data = genfromtxt(file_name, delimiter=',', skip_header=1, converters={0: lambda y: str(y),1: lambda z: str(z),10: lambda x: str(x),12: lambda a: str(a)})
         return data.tolist()
     return []
 
 def populate_price(egid, db_session, record,name_of_class):  #Price_Dao
-
-     db_record =  name_of_class(**{                                                          #populate prices table correspoding to the egid
+     if len(record)>12 :
+        db_record =  name_of_class(**{                                                          #populate prices table correspoding to the egid
                                          'egid' :egid,
                                          'todays_date' : datetime.datetime.strptime(record[10],'%d-%b-%Y').date(),
                                          'open_price':record[2],
@@ -35,7 +44,18 @@ def populate_price(egid, db_session, record,name_of_class):  #Price_Dao
                                          'close_price':record[5],
                                          'volume_traded':record[11]
                                   })
-     db_session.add(db_record)
+        db_session.add(db_record)
+     else:
+        db_record =  name_of_class(**{                                                          #populate prices table correspoding to the egid
+                                         'egid' :egid,
+                                         'todays_date' : datetime.datetime.strptime(record[10],'%d-%b-%Y').date(),
+                                         'open_price':record[2],
+                                         'high_price':record[3],
+                                         'low_price':record[4],
+                                         'close_price':record[5],
+                                         'volume_traded':None
+                                  })
+        db_session.add(db_record)
 
 def populate_attribute(egid, db_session, Attribute_Dao, attribute_type, attribute_value, start_date, end_date):
     db_record = Attribute_Dao(**{'egid':egid, 'attribute':attribute_type, 'attributevalue':attribute_value,'startdate':start_date,'enddate':end_date})
@@ -83,17 +103,17 @@ def populate_last_egid (value_of_last_generated_egid,db_session,name_of_class):
 def main(args):
     
     start_date = datetime.datetime(int(args[0]), int(args[1]), int(args[2]))
-    now = datetime.datetime.now()
-    #now = start_date + datetime.timedelta(days=21)
+    #now = datetime.datetime.now()
+    now = start_date + datetime.timedelta(days=5)
 	
     t = time()
     
     symbolchange={}
-    create_dictionary_for_symbolchange ('symbolchange.csv', symbolchange)
+    create_dictionary_for_symbolchange ('test_symbolchange.csv', symbolchange)
 
     #engine = create_engine('mysql+pymysql://egil_user:egil_user@egsecuritymaster.cvxyuzctu0dv.ap-south-1.rds.amazonaws.com:3306/eg12')
 
-    engine = create_engine('mysql+pymysql://bors_master:uJ!DicDu*7sW@bors-db1.inmu1.eglp.com:3306/egil')
+    engine = create_engine('mysql+pymysql://bors_master:uJ!DicDu*7sW@bors-db1.inmu1.eglp.com:3306/test')
 
     engine.echo = False
 
@@ -164,8 +184,11 @@ def main(args):
                          #populate_attributes_old_nseticker (egid_counter,s1,i,Attributes,None)
                          populate_attribute(egid_counter, s1, Attributes, 2, i[0],datetime.datetime.strptime(i[10],'%d-%b-%Y').date(), None)
 
-                      populate_attribute(egid_counter,s1,Attributes,5,i[12],datetime.datetime.strptime(i[10],'%d-%b-%Y').date(),None)
-
+                      if len(i)>12:
+                          populate_attribute(egid_counter,s1,Attributes,5,i[12],datetime.datetime.strptime(i[10],'%d-%b-%Y').date(),None)
+                      else:
+                          populate_attribute(egid_counter,s1,Attributes,5,'None',datetime.datetime.strptime(i[10],'%d-%b-%Y').date(),None)
+                      
                       populate_instruments(egid_counter,s1,i,Instruments)
 
                       populate_price(egid_counter,s1 ,i,Prices)
