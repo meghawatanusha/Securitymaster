@@ -113,7 +113,7 @@ def main(args):
                        # underlying_query = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == i[1]).first()
                         record3 = Future_series(**{ 'future_series_id':future_id_counter ,
                                                     'future_series_name':underlying_fut,
-                                                    'underlying_id':None,
+                                                    'underlying_id':21000,
                                                     'underlying_name':'IDX',
                                                     'startdate':start_date,
                                                     'enddate': datetime.datetime.strptime(str('01-01-2100'),'%d-%m-%Y')
@@ -226,7 +226,7 @@ def main(args):
                        # underlying_query = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == i[1]).first()
                         record3 = Future_series(**{ 'future_series_id':future_id_counter ,
                                                     'future_series_name':underlying_fut,
-                                                    'underlying_id':None,
+                                                    'underlying_id':21000,
                                                     'underlying_name':'IVX',
                                                     'startdate':start_date,
                                                     'enddate': datetime.datetime.strptime(str('01-01-2100'),'%d-%m-%Y')
@@ -316,7 +316,7 @@ def main(args):
                          s1.add(fut_contract)
 
 
-                  elif ((i[0] == 'FUTSTK')):
+                  elif ((i[0]=='FUTSTK')):
                   
                 
                 #if Underlying Future already exists, populate price table correspoding to the egid and current date
