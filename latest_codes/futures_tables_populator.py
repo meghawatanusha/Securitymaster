@@ -81,30 +81,43 @@ def main(args):
             day = "0" + day
     
         data = Load_Data(start_date.year,month.upper(),day)
+        active_future_series = {}
         active_futures = {}
     
     #SYMBOL,SERIES,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,TOTTRDQTY,TOTTRDVAL,TIMESTAMP,TOTALTRADES,ISIN,
         try: 
             for i in data:
-                if (i[0] != 'FUTSTK' or 'FUTIDX'):
+                if ((i[0] != 'FUTSTK') or (i[0] != 'FUTIDX')):
                     continue
                 
-                #put all the active stocks of today in a dictionary
-                active_futures[i[1]] = 1
-                
-                #if equity already exists, populate price table correspoding to the egid and current date
-                exist_query = s1.query(Attributes).filter(Attributes.attribute == 2).filter(Attributes.attributevalue == i[1])
+                #if Underlying Future already exists, populate price table correspoding to the egid and current date
+                underlying_fut = i[1] + ' FUTURE'
+                expiry_date = datetime.datetime.strptime(i[2], "%d-%b-%Y")
+                future_symbol = i[1] + ' ' + expiry_date.strftime("%b").upper() + ' ' + str(expiry_date.year)
+                active_futures[future_symbol] = 1
+                active_future_series[underlying_fut] = 1
+                exist_query = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == underlying_fut)
                 if (s1.query(exist_query.exists()).scalar()):                       
                 # get egid of the existing stock corresponding to the nseticker
-                    existing_egid = s1.query(Attributes).filter(Attributes.attribute == 2).filter(Attributes.attributevalue == i[1]).first()
+                    #existing_egid = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == underlying_fut).first()
+                    future_egid = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == future_symbol).first()
                 
-                    if not existing_egid:
-                        print "Error while fetching egid"
-                        return 
+                    if not future_egid:
+                        future_id_counter += 1
+                        future_egid = future_id_counter
+                        future_attr =  Attributes(**{'egid':future_egid, 'attribute':3, 'attributevalue':future_symbol})
+                        s1.add(future_attr)
+                        fut_instrument = Instruments(**{'egid':future_egid,
+                                         'instrument_type':2,
+                                         'startdate':datetime.datetime.strptime(i[14],'%d-%b-%Y').date(),
+                                         'enddate':None
+                                      })
+                        s1.add(fut_instrument)
+
                          
                          
                     record3 =  Prices(**{
-                                         'egid' : existing_egid.egid,
+                                         'egid' : future_egid,
                                          'todays_date' : datetime.datetime.strptime(i[14],'%d-%b-%Y').date(),
                                          'open_price':i[5],
                                          'high_price':i[6],
@@ -115,7 +128,7 @@ def main(args):
                                   })
                     s1.add(record3)
                     
-                    record4 =  Open_interest_table(**{'egid':future_id_counter,                                             
+                    record4 =  Open_interest_table(**{'egid':future_egid,                                             
                                          'startdate':datetime.datetime.strptime(i[14],'%d-%b-%Y').date(),
                                          'open_interest':i[12],
                                          'change_in_open_interest':i[13]
@@ -131,7 +144,7 @@ def main(args):
                     future_id_counter=future_id_counter+1   
                     
                     #populate attributes table with egid
-                    record1a =  Attributes(**{'egid':future_id_counter, 'attribute':2, 'attributevalue':i[1]}) 
+                    record1a =  Attributes(**{'egid':future_id_counter, 'attribute':3, 'attributevalue':underlying_fut}) 
                     s1.add(record1a)
 
                     #populate attributes table with isin
@@ -145,6 +158,16 @@ def main(args):
                                          'enddate':None
                                       })
                     s1.add(record2)
+                    future_id_counter += 1
+                    future_egid = future_id_counter
+                    future_attr =  Attributes(**{'egid':future_egid, 'attribute':3, 'attributevalue':future_symbol})
+                    s1.add(future_attr)
+                    fut_instrument = Instruments(**{'egid':future_egid,
+                                         'instrument_type':2,
+                                         'startdate':datetime.datetime.strptime(i[14],'%d-%b-%Y').date(),
+                                         'enddate':None
+                                      })
+                    s1.add(fut_instrument)
 
                     #populate prices table correspoding to the egid
                     record3 =  Prices(**{                                                          
@@ -174,23 +197,40 @@ def main(args):
             #code for finding the delisted stocks
             
             #active_stocks_in_db = s1.query(Instruments).filter(Instruments.enddate is None).filter(Instruments.instrument_type==1).all()
-                    nseticker_for_active_futures_in_db = s1.query(Instruments,Attributes).join(Instruments.egid==Attributes.egid).filter(Attributes.attribute==2).filter(Instruments.instrument_type==3,Instruments.enddate== None).all()
+        nseticker_for_active_futures_in_db = s1.query(Instruments,Attributes).join(Instruments.egid==Attributes.egid).filter(Attributes.attribute==3).filter(Instruments.instrument_type==2,Instruments.enddate== None).all()
             #nse_ticker_for_active_stocks_in_db=s1.query(Instruments).select_from(Attributes).join(Instruments.egid==Attributes.egid).filter(Attributes.attribute==2).filter(Instruments.enddate is None).filter(Instruments.instrument_type==1).all()
             
-            
-                    deadfuture={}
-                    
-                    for row in nse_ticker_for_active_futures_in_db: 
-                    if row[1].attvibutevalue in active_futures[]:
-                       continue
-                    else:
-                       print row[1].attvibutevalue " is not present in the CSV file. Update End date as d-1." 
-                       deadfuture[row[0].egid] = row[1].attributevalue      # d = {1:'one',2:'two,3:'three'} all the keys in [1,2,3]
+        deadfuture={}
+                
+        for row in nse_ticker_for_active_futures_in_db: 
+            if row[1].attributevalue in active_futures.keys():
+                continue
+            else:
+                print row[1].attributevalue " is not present in the CSV file. Update End date as d-1." 
+                deadfuture[row[0].egid] = row[1].attributevalue      # d = {1:'one',2:'two,3:'three'} all the keys in [1,2,3]
                         
                 #update end date of stock 
-                    future_closing_date = start_date - datetime.timedelta(1) 
-                    for key in deadstock:
-                       s1.query(Instruments).filter(egid==key).filter(instrument_type==1).update({Instruments.enddate:future_closing_date})
+        future_closing_date = start_date - datetime.timedelta(1) 
+        for key in deadstock:
+            s1.query(Instruments).filter(egid==key).filter(instrument_type==2).update({Instruments.enddate:future_closing_date})
+
+
+        nseticker_for_active_future_series_in_db = s1.query(Instruments,Attributes).join(Instruments.egid==Attributes.egid).filter(Attributes.attribute==3).filter(Instruments.instrument_type==3,Instruments.enddate== None).all()
+                 
+        dead_future_series={}
+
+        for row in nse_ticker_for_active_futures_series_in_db:
+            if row[1].attributevalue in active_future_series.keys():
+                continue
+            else:
+                print row[1].attributevalue " is not present in the CSV file. Update End date as d-1."
+                dead_future_series[row[0].egid] = row[1].attributevalue      # d = {1:'one',2:'two,3:'three'} all the keys in [1,2,3]
+
+                #update end date of stock
+        future_closing_date = start_date - datetime.timedelta(1)
+        for key in dead_future_series.keys():
+            s1.query(Instruments).filter(egid==key).filter(instrument_type==3).update({Instruments.enddate:future_closing_date})
+
                             
                     
         #record6 = last_generated_egid(**{'last_generated_egid':future_id_counter})                                         #recording the last generated egid
