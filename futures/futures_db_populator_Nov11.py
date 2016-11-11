@@ -13,7 +13,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, MetaData, Table, Column, ForeignKey
-from comprehensive_table_creator import Base
+from comprehensive_table_creator1 import Base
 from sqlalchemy.ext.automap import automap_base
 
 def Load_Data(year="2013",mon="NOV",dd="06"):
@@ -68,10 +68,11 @@ def populate_future_series(future_series_dao,db_session,egid,future_series_name,
                                    })
     db_session.add(db_record) 
 
-def populate_futures_contracts(futures_contracts_dao,db_session,egid,record,future_series_id,start_date,expiration_date,last_trade_date):
+def populate_futures_contracts(futures_contracts_dao,db_session,egid,record,future_series_id,future_symbol,start_date,expiration_date,last_trade_date):
 
     db_record = futures_contracts_dao(**{ 'future_id':egid,
-                                         'nseticker':record[1],
+                                         'trade_date':datetime.datetime.strptime(record[14],'%d-%b-%Y').date(),
+                                         'name':future_symbol,
                                          'future_series_id':future_series_id,
                                          'contract_size':record[10] ,
                                          'list_date':start_date,
@@ -89,12 +90,16 @@ def populate_open_interest(open_interest_dao,db_session,egid,record):
                                            })
     db_session.add(db_record)
 
+def populate_last_egid (value_of_last_generated_egid,db_session,name_of_class):
+    db_record = name_of_class(**{'last_generated_egid':value_of_last_generated_egid})
+    db_session.add(db_record)
+
 
 def main(args):
     
     start_date = datetime.datetime(int(args[0]), int(args[1]), int(args[2]))
-#    now = datetime.datetime.now()
-    now = start_date + datetime.timedelta(days=2)
+    now = datetime.datetime.now()
+ #   now = start_date + datetime.timedelta(days=2)
     
     t = time()
     
@@ -102,7 +107,7 @@ def main(args):
 
     #Create the database
     #engine = create_engine('mysql+pymysql://egil_user:egil_user@egsecuritymaster.cvxyuzctu0dv.ap-south-1.rds.amazonaws.com:3306/eg8')
-    engine = create_engine('mysql+pymysql://bors_master:uJ!DicDu*7sW@bors-db1.inmu1.eglp.com:3306/borsresdb')
+    engine = create_engine('mysql+pymysql://bors_master:uJ!DicDu*7sW@bors-db1.inmu1.eglp.com:3306/futures_new')
     # If you change it to true - it will diaplay all the equivalent mysql statements 
     engine.echo = False  
 
@@ -120,7 +125,7 @@ def main(args):
     Instruments = Base.classes.instruments
     Prices = Base.classes.prices
     Prices_futures = Base.classes.prices_futures
-    last_generated_egid = Base.classes.last_generated_egid
+    last_egid = Base.classes.last_generated_egid
     New_entries = Base.classes.new_entries
     Future_series = Base.classes.futureseries
     Futures_contract_table = Base.classes.futures_contract_table
@@ -131,7 +136,7 @@ def main(args):
     session.configure(bind=engine)
     s1 = session()
 #    future_id_counter = 0
-    egid_counter_query = s1.query(last_generated_egid).first()
+    egid_counter_query = s1.query(last_egid).first()
     future_id_counter = egid_counter_query.last_generated_egid
 
  
@@ -206,7 +211,7 @@ def main(args):
 
                          underlying_query = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == underlying_fut).first() 
 
-                         populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,start_date,expiry_date,expiry_date)
+                         populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,future_symbol,start_date,expiry_date,expiry_date)
 
                          populate_open_interest(Open_interest_table,s1,future_egid,i)
                          
@@ -227,7 +232,7 @@ def main(args):
 
                          underlying_query = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == underlying_fut).first()          
                          index_query = s1.query(Attributes).filter(Attributes.attribute==3).filter(Attributes.attributevalue == underlying).first()                         
-                         populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,start_date,expiry_date,expiry_date)
+                         populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,future_symbol,start_date,expiry_date,expiry_date)
          
                          s1.query(Instruments).filter(Instruments.egid==future_egid).filter(Instruments.instrument_type==2).update({Instruments.enddate:start_date})
                          s1.query(Instruments).filter(Instruments.egid==underlying_query.egid).filter(Instruments.instrument_type==3).update({Instruments.enddate:start_date})
@@ -271,7 +276,7 @@ def main(args):
                          populate_futures_price(future_egid,s1,i,Prices_futures)
 
                          underlying_query = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == underlying_fut).first()
-                         populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,start_date,expiry_date,expiry_date)          
+                         populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,future_symbol,start_date,expiry_date,expiry_date)          
                       
                          populate_open_interest(Open_interest_table,s1,future_egid,i)
                          
@@ -294,10 +299,10 @@ def main(args):
                          underlying_query = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == underlying_fut).first()
                          expiration_date_query = s1.query(Futures_contract_table).filter(Futures_contract_table.future_id==future_egid).first()
                          if (expiration_date_query.expiration_date == expiry_date):
-                           populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,start_date,expiry_date,expiry_date)
+                           populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,future_symbol,start_date,expiry_date,expiry_date)
                            continue
                          else: 
-                           populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,start_date,expiry_date,expiry_date)
+                           populate_futures_contracts(Futures_contract_table,s1,future_egid,i,underlying_query.egid,future_symbol,start_date,expiry_date,expiry_date)
                            
                            future_query1 = s1.query(Attributes).filter(Attributes.attribute == 3).filter(Attributes.attributevalue == future_symbol).first()
                            special_expiry_future_name = str(future_query1.attributevalue) 
@@ -313,13 +318,15 @@ def main(args):
                          s1.query(Future_series).filter(Future_series.future_series_id==underlying_query.egid).update({Future_series.enddate:start_date})
 
                   else :
-                   # print "Options and IVX futures are not to be included"
+                    #print "Options and IVX futures are not to be included"
                     continue
-    
+
+                  s1.query(last_egid).filter(last_egid.serial_no==1).update({last_egid.last_generated_egid:future_id_counter})
+ 
                   s1.commit()
                       #populate New_entries table with egid and start date
                 else :
-                  print "Erratic entries in the CSV file."
+                  print "Erratic entries in the futures bhavcopy CSV file."
                   continue
           except Exception,e:
                   print "Error while processing files. Rollingback the transactions"
